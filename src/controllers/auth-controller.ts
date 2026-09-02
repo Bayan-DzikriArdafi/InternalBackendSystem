@@ -2,7 +2,10 @@ import type { Response, Request } from "express";
 import axios, { type AxiosRequestConfig } from "axios";
 import { code_challenge, code_verifier } from "../configs/init-config.js";
 import { getBasicAuthHeader } from "../utils/key-config.js";
-import { basicApiInstance } from "../utils/basicApi-util.js";
+import {
+  basicApiInstance,
+  basicTokenizationApiIns,
+} from "../utils/basicApi-util.js";
 
 export const logoutHandler = async (req: Request, res: Response) => {
   const BASE_AUTH_URL = process.env.BASE_AUTH_URL as string;
@@ -46,9 +49,11 @@ export const logoutHandler = async (req: Request, res: Response) => {
 };
 
 export const loginHandler = async (req: Request, res: Response) => {
-  const BASE_AUTH_URL = process.env.BASE_AUTH_URL;
-  const CLIENT_ID = process.env.CLIENT_ID;
-  const REDIRECT_URI = process.env.REDIRECT_URI;
+  const BASE_AUTH_URL = process.env.BASE_AUTH_URL!;
+  const CLIENT_ID = process.env.CLIENT_ID!;
+  const REDIRECT_URI = process.env.REDIRECT_URI!;
+  const IAS_AUTH_URL = process.env.IAS_AUTH_URL!;
+  const IAS_CLIENT_ID = process.env.IAS_CLIENT_ID!;
 
   const loginHint = encodeURIComponent(
     JSON.stringify({
@@ -56,19 +61,30 @@ export const loginHandler = async (req: Request, res: Response) => {
     }),
   );
 
-  const authURL =
-    `${BASE_AUTH_URL}/oauth/authorize` +
-    `?response_type=code` +
-    `&client_id=${CLIENT_ID}` +
-    `&redirect_uri=${REDIRECT_URI}` +
-    `&code_challenge=${code_challenge}` +
-    `&code_challenge_method=S256` +
-    `&state=xyz123` +
-    `&scope=openid` +
-    `&login_hint=${loginHint}`;
+  // const authURL =
+  //   `${IAS_AUTH_URL}` +
+  //   `?response_type=code` +
+  //   `&client_id=${IAS_CLIENT_ID}` +
+  //   `&redirect_uri=${REDIRECT_URI}` +
+  //   `&code_challenge=${code_challenge}` +
+  //   `&code_challenge_method=S256` +
+  //   `&state=xyz123` +
+  //   `&scope=openid` +
+  //   `&login_hint=${loginHint}`;
 
+  const params = new URLSearchParams({
+    response_type: "code",
+    client_id: IAS_CLIENT_ID!,
+    redirect_uri: REDIRECT_URI!,
+    scope: "openid email profile",
+    // code_challenge: code_challenge,
+    // code_challenge_method: "S256",
+    // state: "xyz123",
+    // login_hint: loginHint,
+  });
   try {
-    return res.status(200).redirect(authURL);
+    const loginUrl = `${process.env.IAS_AUTH_URL}?${params.toString()}`;
+    return res.status(200).redirect(loginUrl);
   } catch (error) {
     res.json({
       statusCode: 500,
@@ -82,33 +98,40 @@ export const callbackHandler = async (req: Request, res: Response) => {
   const CLIENT_ID = process.env.CLIENT_ID as string;
   const REDIRECT_URI = process.env.REDIRECT_URI;
   const CLIENT_SECRET = process.env.CLIENT_SECRET as string;
+  const IAS_CLIENT_ID = process.env.IAS_CLIENT_ID!;
+  const IAS_CLIENT_SECRET = process.env.IAS_CLIENT_SECRET!;
+  const IAS_TOKEN_URL = process.env.IAS_TOKEN_URL!;
 
   const code = req.query.code;
-
-  const tokenURLPath = `${BASE_AUTH_URL}/oauth/token`;
+  if (!code || typeof code !== "string") {
+    return res.status(400).send("Authorization code tidak ditemukan");
+  }
 
   //   Set request config
   const urlSearchParamsConf = {
     grant_type: "authorization_code",
     code: code,
     redirect_uri: REDIRECT_URI,
-    client_id: CLIENT_ID,
-    code_verifier: code_verifier,
+    // client_id: IAS_CLIENT_ID,
+    // code_verifier: code_verifier,
   } as any;
 
   const headersConf = {
     "Content-Type": "application/x-www-form-urlencoded",
   };
 
+  const authConf = {
+    username: IAS_CLIENT_ID,
+    password: IAS_CLIENT_SECRET,
+  };
+
   try {
-    const tokenResponse = await basicApiInstance().post(
-      tokenURLPath,
+    const tokenResponse = await basicTokenizationApiIns().post(
+      IAS_TOKEN_URL,
       new URLSearchParams(urlSearchParamsConf),
       {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Authorization: getBasicAuthHeader(CLIENT_ID, CLIENT_SECRET),
-        },
+        headers: headersConf,
+        auth: authConf,
       },
     );
     const accessToken = tokenResponse.data.access_token;
@@ -131,6 +154,7 @@ export const exchangeHandler = async (req: Request, res: Response) => {
   const CLIENT_ID = process.env.CLIENT_ID as string;
   const REDIRECT_URI = process.env.REDIRECT_URI;
   const CLIENT_SECRET = process.env.CLIENT_SECRET as string;
+  const IAS_TOKEN_URL = process.env.IAS_TOKEN_URL!;
 
   const code = req.query.code;
   if (!code) {
@@ -139,8 +163,6 @@ export const exchangeHandler = async (req: Request, res: Response) => {
       error: {},
     });
   }
-
-  const tokenURLPath = `${BASE_AUTH_URL}/oauth/token`;
 
   //   Set request config
   const urlSearchParamsConf = {
@@ -152,8 +174,8 @@ export const exchangeHandler = async (req: Request, res: Response) => {
   } as any;
 
   try {
-    const tokenResponse = await basicApiInstance().post(
-      tokenURLPath,
+    const tokenResponse = await basicTokenizationApiIns().post(
+      IAS_TOKEN_URL,
       new URLSearchParams(urlSearchParamsConf),
       {
         headers: {
@@ -190,14 +212,14 @@ export const refreshTokenHandler = async (req: Request, res: Response) => {
       });
     }
 
-    const BASE_AUTH_URL = process.env.BASE_AUTH_URL;
+    const BASE_AUTH_URL = process.env.IAS_TOKEN_URL!;
 
-    const url = `${BASE_AUTH_URL}/oauth/token`;
+    const url = BASE_AUTH_URL;
     const urlSearchParamsConf = {
       grant_type: "refresh_token",
       refresh_token,
-      client_id: process.env.CLIENT_ID,
-      client_secret: process.env.CLIENT_SECRET,
+      client_id: process.env.IAS_CLIENT_ID,
+      client_secret: process.env.IAS_CLIENT_SECRET,
     } as any;
 
     const response = await basicApiInstance().post(

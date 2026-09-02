@@ -13,7 +13,16 @@ export const basicApiInstance = () => {
   const instance = axios.create({
     baseURL: process.env.BASE_APP_URL as string,
     timeout: 60000,
-    httpsAgent: proxyAgent,
+    httpsAgent: process.env.NODE_ENV == "production" && proxyAgent,
+  });
+
+  return instance;
+};
+
+export const basicTokenizationApiIns = () => {
+  const instance = axios.create({
+    baseURL: process.env.IAS_TOKEN_URL as string,
+    timeout: 60000,
   });
 
   return instance;

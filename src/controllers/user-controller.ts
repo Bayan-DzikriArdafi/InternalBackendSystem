@@ -1,6 +1,7 @@
 import axios from "axios";
 import type { Response, Request } from "express";
 import {
+  constructODataEndpoint,
   generateRandomGreatings,
   getInitiliazieDataReuse,
 } from "../utils/index-util.js";
@@ -16,20 +17,39 @@ export const initializationHandler = async (req: Request, res: Response) => {
   // --> Generate random greatings
   const greatingMessage = generateRandomGreatings();
 };
+
 export const getMatchingProfile = async (req: Request, res: Response) => {
   const accessToken =
     req.headers.authorization || (process.env.ACCESS_TOKEN as string);
   const BASE_APP_URL = process.env.BASE_APP_URL;
 
   const requestURL = `${BASE_APP_URL}/odata/v4/current-user/ZC_GET_CURRENT_USER`;
+
   try {
-    const response = await createApiInstance(accessToken).get(requestURL);
+    const path = constructODataEndpoint({
+      entity: "zc_get_current_user_cds",
+      service: "ZC_GET_CURRENT_USER",
+      params: {
+        $format: "json",
+      },
+    });
+    // const response = await createApiInstance(accessToken).get("/", {
+    //   params: {
+    //     path,
+    //   },
+    // });
+    const response = await createApiInstance(accessToken).get(
+      `https://sap-proxy.cfapps.ap11.hana.ondemand.com/api/sap/odata?path=/sap/opu/odata/sap/zc_get_current_user_cds/ZC_GET_CURRENT_USER?$format=json`,
+    );
 
     console.log(`${new Date()} ----------- `, response.data.value[0].UserEmail);
 
     res.setHeader("Content-Type", "application/json");
     return res.status(200).json(response.data);
   } catch (error) {
+    console.log("====================================");
+    console.log(error);
+    console.log("====================================");
     return res.json({
       statusCode: 500,
       message: "Internal Server Error get profile",

@@ -24,3 +24,15 @@ export interface PendingApprovalDetailParams {
 
   TaskIndicator: string | undefined;
 }
+
+type IODataQuery = {
+  $filter?: string;
+  $expand?: string;
+  $select?: string;
+  $format?: string;
+};
+export type IODataEnpointConf = {
+  service: string;
+  entity: string;
+  params?: IODataQuery;
+};

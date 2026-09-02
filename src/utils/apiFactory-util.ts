@@ -1,17 +1,27 @@
 import axios from "axios";
 import { HttpsProxyAgent } from "https-proxy-agent";
 
-const proxyAgent = new HttpsProxyAgent("http://host.docker.internal:3128");
+const proxyUrl = process.env.HTTPS_PROXY_URL!;
+
+const proxyAgent =
+  process.env.NODE_ENV === "production"
+    ? new HttpsProxyAgent(proxyUrl)
+    : undefined;
 
 export const createApiInstance = (token: string) => {
   const instance = axios.create({
-    baseURL: process.env.BASE_APP_URL as string,
+    baseURL: process.env.SAP_PROXY_URL!,
     timeout: 60000,
-    httpsAgent: proxyAgent,
+    ...(proxyAgent && {
+      httpsAgent: proxyAgent,
+    }),
   });
 
   instance.interceptors.request.use((config) => {
-    config.headers.Authorization = `${token}`;
+    config.headers.Authorization = token;
+    const fullUrl = axios.getUri(config);
+
+    console.log("Axios Request URL:", fullUrl);
     return config;
   });
 

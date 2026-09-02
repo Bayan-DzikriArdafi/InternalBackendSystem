@@ -1,6 +1,7 @@
 import type { AxiosInstance } from "axios";
 import { greetings } from "../constants/greatings.js";
 import { createApiInstance } from "./apiFactory-util.js";
+import type { IODataEnpointConf } from "../interface/index.js";
 
 export const generateQuery = (arrayString: string[]) => {
   return arrayString.join(",");
@@ -135,4 +136,24 @@ export const getInitiliazieDataReuse = async (accessToken: string) => {
   } catch (error: any) {
     throw error.message || "Error initializing your data";
   }
+};
+
+export const constructODataEndpoint = ({
+  service,
+  entity,
+  params,
+}: IODataEnpointConf): string => {
+  const queryParams = new URLSearchParams();
+
+  Object.entries(params ?? {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      queryParams.append(key, value);
+    }
+  });
+
+  const queryString = queryParams.toString();
+
+  return `/sap/opu/odata/sap/${entity}/${service}${
+    queryString ? `?${queryString}` : ""
+  }`;
 };
